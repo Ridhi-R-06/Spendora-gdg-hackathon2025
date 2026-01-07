@@ -1,14 +1,675 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
-  <link href='/style.css' rel='stylesheet'>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spendora - Final Production</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"></script>
+
+    <script type="importmap">
+      { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
+    </script>
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --danger: #ef4444;
+            --gold: #f59e0b;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); margin: 0; padding: 20px; }
+        
+        #login-screen { display: flex; height: 100vh; justify-content: center; align-items: center; flex-direction: column; text-align: center; }
+        
+        #dashboard { display: none; max-width: 1200px; margin: 0 auto; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; }
+        
+        .card { background: var(--surface); border-radius: 16px; padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; }
+        
+        h2, h3 { margin-top: 0; color: var(--text-main); }
+        .label { font-size: 0.85rem; color: var(--text-sub); font-weight: 500; display: block; margin-bottom: 8px; }
+        
+        input, select, button { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); font-family: inherit; margin-bottom: 12px; box-sizing: border-box; font-size: 1rem; }
+        
+        button { background: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        button.secondary { background: white; color: var(--primary); border: 1px solid var(--primary); }
+        
+        .pay-btn { background: var(--text-main); font-size: 0.8rem; padding: 5px 10px; width: auto; margin-left: 10px; }
+        .pay-btn:hover { background: black; }
+
+        .notification-item { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; padding: 10px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.9rem; }
+        .accept-btn { background: var(--success); padding: 6px 12px; font-size: 0.8rem; width: auto; margin: 0; }
+        .reject-btn { background: var(--danger); padding: 6px 12px; font-size: 0.8rem; width: auto; margin: 0; }
+
+        .balance-card { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; border: none; }
+        .balance-card h3, .balance-card .label { color: rgba(255,255,255,0.9); }
+        .savings-card { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; }
+        
+        /* OPTIONAL CARDS */
+        .emergency-card { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; border: none; cursor: pointer; transition: transform 0.2s; }
+        .emergency-card:hover { transform: scale(1.02); }
+        .emergency-card h3, .emergency-card .label { color: rgba(255,255,255,0.9); }
+
+        .investment-card { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; border: none; cursor: pointer; transition: transform 0.2s; }
+        .investment-card:hover { transform: scale(1.02); }
+        .investment-card h3, .investment-card .label { color: rgba(255,255,255,0.9); }
+
+        .emergency-expense { border-left: 4px solid #ef4444; background: #fef2f2; }
+        .emergency-expense span { color: #b91c1c; font-weight: bold; }
+
+        .balance-stats { display: flex; gap: 15px; margin-top: 20px; }
+        .stat-box { background: rgba(255,255,255,0.15); padding: 10px 15px; border-radius: 10px; backdrop-filter: blur(5px); flex: 1; }
+
+        header { max-width: 1200px; margin: 0 auto 30px auto; display: flex; justify-content: space-between; align-items: center; display: none; }
+        .points-badge { 
+            background: #fffbeb; color: #b45309; padding: 8px 16px; border-radius: 20px; font-weight: bold; 
+            cursor: pointer; display: flex; align-items: center; gap: 5px; transition: transform 0.2s;
+        }
+        .points-badge:hover { transform: scale(1.05); }
+        
+        .settings-btn {
+            background: #e2e8f0; color: #475569; padding: 8px; border-radius: 50%; 
+            display: flex; justify-content: center; align-items: center; cursor: pointer; margin-left: 10px;
+        }
+        .settings-btn:hover { background: #cbd5e1; }
+
+        .transaction-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+
+        /* MODALS */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(5px); }
+        .auth-box { background: white; padding: 30px; border-radius: 16px; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: popIn 0.3s ease; }
+        .auth-box h2 { color: var(--primary); margin-bottom: 20px; }
+        .auth-box input { margin-bottom: 10px; }
+        .link-text { color: var(--primary); cursor: pointer; font-size: 0.9rem; text-decoration: underline; margin-top: 15px; display: block; }
+        #confirm-pass-container { display: none; }
+
+        /* FEATURE CHECKBOXES */
+        .feature-item { display: flex; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; text-align: left; }
+        .feature-item input { width: auto; margin: 0 10px 0 0; }
+        .feature-item label { flex: 1; font-weight: 500; cursor: pointer; }
+    </style>
 </head>
 <body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
-  <script defer type="text/javascript" src="/main.js"></script>
+
+    <div id="auth-modal" class="modal-overlay">
+        <div class="auth-box">
+            <h2 id="auth-title">Login</h2>
+            <input type="email" id="auth-email" placeholder="Email (e.g., demo@test.com)">
+            <input type="password" id="auth-pass" placeholder="Password (min 6 chars)">
+            <div id="confirm-pass-container">
+                <input type="password" id="auth-pass-confirm" placeholder="Confirm Password">
+            </div>
+            <button onclick="submitAuth()" id="auth-btn">Login</button>
+            <span class="link-text" onclick="toggleAuthMode()" id="auth-toggle">New here? Create an Account</span>
+            <span class="link-text" onclick="closeAuthModal()" style="color: var(--text-sub); text-decoration: none; font-size: 0.8rem;">Cancel</span>
+        </div>
+    </div>
+
+    <div id="feature-modal" class="modal-overlay">
+        <div class="auth-box">
+            <h2>Customize Spendora</h2>
+            <p style="font-size: 0.9rem; color: var(--text-sub); margin-bottom: 20px;">Select features to enable:</p>
+            
+            <div id="feature-list">
+                <div class="feature-item" style="background: #f1f5f9; opacity: 0.7;">
+                    <input type="checkbox" checked disabled>
+                    <label>Total Balance & Expenses</label>
+                </div>
+                <div class="feature-item" style="background: #f1f5f9; opacity: 0.7;">
+                    <input type="checkbox" checked disabled>
+                    <label>Smart Savings</label>
+                </div>
+                <div class="feature-item" style="background: #f1f5f9; opacity: 0.7;">
+                    <input type="checkbox" checked disabled>
+                    <label>Add Expense</label>
+                </div>
+
+                <div class="feature-item">
+                    <input type="checkbox" id="feat-emergency">
+                    <label for="feat-emergency">Emergency Fund</label>
+                </div>
+                <div class="feature-item">
+                    <input type="checkbox" id="feat-investment">
+                    <label for="feat-investment">Investments</label>
+                </div>
+                <div class="feature-item">
+                    <input type="checkbox" id="feat-budget">
+                    <label for="feat-budget">AI Weekly Budget</label>
+                </div>
+                <div class="feature-item">
+                    <input type="checkbox" id="feat-forecast">
+                    <label for="feat-forecast">Spending Forecast (Chart)</label>
+                </div>
+                <div class="feature-item">
+                    <input type="checkbox" id="feat-group">
+                    <label for="feat-group">Group Connect</label>
+                </div>
+            </div>
+
+            <button onclick="saveFeatures()">Confirm Changes</button>
+        </div>
+    </div>
+
+    <div id="login-screen">
+        <h1 style="font-size: 3rem; margin-bottom: 10px; color: var(--primary);">Spendora</h1>
+        <p style="color: var(--text-sub); margin-bottom: 30px;">AI Financial Assistant</p>
+        <button onclick="openAuthModal()" style="width: 280px; padding: 15px;">Login / Sign Up</button>
+    </div>
+
+    <header id="app-header">
+        <div>
+            <h2 style="margin-bottom: 5px;">Spendora</h2>
+            <span id="user-name" style="color: var(--text-sub);">Welcome</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <div class="points-badge" onclick="simulateWeekEnd()" title="Click to Simulate Rewards (Demo)">
+                <span class="material-icons">emoji_events</span>
+                <span id="points-display">Lvl 0 (0 pts)</span>
+            </div>
+            <div class="settings-btn" onclick="openFeatureModal(true)" title="Customize Dashboard">
+                <span class="material-icons">tune</span>
+            </div>
+        </div>
+    </header>
+
+    <div id="dashboard">
+        <div class="card balance-card">
+            <h3>Total Balance</h3>
+            <span class="label">Available (Income - Emergency - Investments)</span>
+            <h1 id="total-balance" style="font-size: 3rem; margin: 15px 0;">₹ ...</h1>
+            <div class="balance-stats">
+                <div class="stat-box"> <span style="font-size: 0.8rem;">Monthly Income</span><br> <b id="income-display">+ ₹...</b> </div>
+                <div class="stat-box"> <span style="font-size: 0.8rem;">Total Spent</span><br> <b id="total-spent">- ₹0</b> </div>
+            </div>
+        </div>
+
+        <div class="card emergency-card" id="card-emergency" onclick="withdrawEmergency()" title="Click to Withdraw Funds">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Emergency Fund</h3> <span class="material-icons" style="opacity:0.8;">health_and_safety</span>
+            </div>
+            <span class="label">Auto-Deducted (Click to Withdraw)</span>
+            <h1 id="emergency-display" style="font-size: 2.5rem; margin: 15px 0;">₹ 0</h1>
+            <div style="background: rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; font-size: 0.9rem;">
+                Goal: <b id="emergency-goal-display">₹...</b> / month
+            </div>
+        </div>
+
+        <div class="card investment-card" id="card-investment" onclick="updateInvestments()" title="Click to Edit Investment Plan">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Investments</h3> <span class="material-icons" style="opacity:0.8;">trending_up</span>
+            </div>
+            <span class="label">Monthly SIPs & Stocks (Click to Edit)</span>
+            <h1 id="investment-display" style="font-size: 2.5rem; margin: 15px 0;">₹ 0</h1>
+            <div style="background: rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; font-size: 0.9rem;">
+                Breakdown: <b id="investment-detail-display">None</b>
+            </div>
+        </div>
+
+        <div class="card savings-card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Smart Savings</h3> <span class="material-icons" style="opacity:0.8;">savings</span>
+            </div>
+            <span class="label">Extra Savings (Leftover)</span>
+            <h1 id="savings-display" style="font-size: 2.5rem; margin: 15px 0;">₹ 0</h1>
+            <button onclick="depositSavings()" style="background: white; color: #d97706; font-weight: bold; margin-top: 15px;">💰 Deposit Remaining</button>
+        </div>
+
+        <div class="card" id="card-group">
+            <h3>Group Connect</h3>
+            <span class="label">One-Time Secure Payments</span>
+            <div id="notification-area"></div>
+            <div id="active-friend-display" style="margin-bottom: 15px; display: none;">
+                <div style="background: #ecfdf5; color: #065f46; padding: 8px; border-radius: 6px; font-size: 0.9rem;">
+                    Connected with: <b id="friend-name-text">...</b>
+                </div>
+            </div>
+            <div id="group-list" style="background: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; max-height: 150px; overflow-y: auto;">
+                <div id="empty-group-msg" style="text-align: center; color: var(--text-sub); font-size: 0.9rem;">Connect with a friend!</div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="secondary" onclick="sendInvite()" style="flex: 1;">Invite</button>
+                <button id="split-btn" onclick="addSplitExpense()" style="flex: 1; opacity: 0.5;" disabled>Split Bill</button>
+            </div>
+        </div>
+
+        <div class="card" id="card-budget">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3>Weekly Budget</h3>
+                <span id="time-left-display" style="font-size: 0.75rem; background: #eff6ff; color: var(--primary); padding: 4px 8px; border-radius: 12px; font-weight: 600;">...</span>
+            </div>
+            <span class="label">AI Optimized (Based on Available Funds)</span>
+            <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                <input type="number" id="budget-food" placeholder="🍔 Food">
+                <input type="number" id="budget-bills" placeholder="💡 Bills">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <input type="number" id="budget-transport" placeholder="🚕 Travel">
+                <input type="number" id="budget-shopping" placeholder="🛍️ Shopping">
+            </div>
+            <button class="secondary" onclick="generateAIBudget()" style="margin-top: 5px;">✨ Generate Plan</button>
+            <p id="ai-suggestion" style="font-size: 0.85rem; color: var(--primary); margin-top: 15px; font-style: italic;"></p>
+        </div>
+
+        <div class="card">
+            <h3>Add Expense</h3>
+            <input type="text" id="smart-input" placeholder="e.g. 'Lunch 250'">
+            <div style="display: flex; gap: 10px;">
+                <select id="manual-category"> <option value="Food">Food</option> <option value="Transport">Transport</option> <option value="Bills">Bills</option> </select>
+                <button onclick="addExpense()">Add</button>
+            </div>
+            <div id="expense-list" style="max-height: 200px; overflow-y: auto; margin-top: 15px;"></div>
+        </div>
+
+        <div class="card" id="card-forecast">
+            <h3>Spending Forecast (TensorFlow.js)</h3>
+            <canvas id="predictionChart" height="150"></canvas>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        // --- KEYS ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyBa1x-KgNJ2idA1CMoLi6nirORfgcIIyd0",
+          authDomain: "gdg-hackathon-31f10.firebaseapp.com",
+          projectId: "gdg-hackathon-31f10",
+          storageBucket: "gdg-hackathon-31f10.firebasestorage.app",
+          messagingSenderId: "731380598762",
+          appId: "1:731380598762:web:159ebb3fc3dd7d56869493"
+        };
+        const GEMINI_KEY = "AIzaSyDbPqhaW2QWjkxBrPri2fcioJ6dM6jV4i4"; 
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        let model = null;
+        try {
+            const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+            // Using Gemma 2 9b (Requires acceptance of terms in AI Studio)
+            model = genAI.getGenerativeModel({ model: "gemma-2-9b-it" });
+        } catch(e) { console.log("Gemini Init Error", e); }
+
+        let currentUser = null, monthlyIncome = 50000, emergencyGoal = 0, investmentGoal = 0, investmentDetails = "None", globalTotalSpent = 0, currentSavings = 0, activeFriendEmail = null;
+        let isSignupMode = false;
+        let chartInstance = null;
+
+        // --------------------------------------------------------
+        // 1. AUTHENTICATION & PROFILE SETUP
+        // --------------------------------------------------------
+        window.openAuthModal = () => document.getElementById('auth-modal').style.display = 'flex';
+        window.closeAuthModal = () => document.getElementById('auth-modal').style.display = 'none';
+
+        window.toggleAuthMode = () => {
+            isSignupMode = !isSignupMode;
+            // (Same Toggle Logic)
+            const title = document.getElementById('auth-title');
+            const btn = document.getElementById('auth-btn');
+            const toggle = document.getElementById('auth-toggle');
+            const confirmBox = document.getElementById('confirm-pass-container');
+            if (isSignupMode) {
+                title.innerText = "Create Account"; btn.innerText = "Sign Up"; toggle.innerText = "Already have an account? Login";
+                confirmBox.style.display = 'block';
+            } else {
+                title.innerText = "Login"; btn.innerText = "Login"; toggle.innerText = "New here? Create an Account";
+                confirmBox.style.display = 'none';
+            }
+        };
+
+        window.submitAuth = async () => {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            const confirmPass = document.getElementById('auth-pass-confirm').value;
+            if (!email || !pass) return alert("Please fill in all fields.");
+
+            try {
+                if (isSignupMode) {
+                    if (pass !== confirmPass) return alert("❌ Passwords do not match!");
+                    if (pass.length < 6) return alert("❌ Password must be at least 6 characters.");
+
+                    const result = await createUserWithEmailAndPassword(auth, email, pass);
+                    currentUser = result.user;
+                    closeAuthModal();
+                    
+                    // --- PROFILE QUESTIONS ---
+                    const incomeInput = prompt("Account Created! \nWhat is your Monthly Income?", "50000");
+                    monthlyIncome = Number(incomeInput) || 50000;
+                    
+                    const emergencyInput = prompt("How much to auto-deduct for Emergency Fund?", "5000");
+                    emergencyGoal = Number(emergencyInput) || 0;
+
+                    let invAmount = 0;
+                    let invDesc = "None";
+                    if(confirm("Do you already invest in Stocks or SIPs?")) {
+                         const amountStr = prompt("Total amount you invest monthly?", "5000");
+                         invAmount = Number(amountStr) || 0;
+                         invDesc = prompt("Breakdown? (e.g. SIP: 2000, Stocks: 3000)", "SIP: 2000, Stocks: 3000");
+                    }
+
+                    // --- SAVE USER ---
+                    await setDoc(doc(db, "users", currentUser.uid), { 
+                        email: email, 
+                        income: monthlyIncome, 
+                        emergencyGoal: emergencyGoal, 
+                        investmentGoal: invAmount,
+                        investmentDetails: invDesc,
+                        savings: 0, 
+                        points: 0,
+                        features: [] // Empty = Will trigger modal
+                    });
+                    
+                    // OPEN FEATURE SELECTION FOR NEW USERS
+                    openFeatureModal(false);
+
+                } else {
+                    const result = await signInWithEmailAndPassword(auth, email, pass);
+                    currentUser = result.user;
+                    closeAuthModal();
+                    showDashboard();
+                }
+            } catch (error) { 
+                console.error(error);
+                alert("Auth Error: " + error.code + "\n" + error.message); 
+            }
+        };
+
+        // --------------------------------------------------------
+        // 2. FEATURE SELECTION SYSTEM (NEW)
+        // --------------------------------------------------------
+        window.openFeatureModal = async (isEditMode) => {
+            document.getElementById('feature-modal').style.display = 'flex';
+            
+            // If Editing, Pre-fill current choices
+            if(isEditMode || currentUser) {
+                const snap = await getDoc(doc(db, "users", currentUser.uid));
+                if(snap.exists() && snap.data().features && snap.data().features.length > 0) {
+                    const feats = snap.data().features;
+                    document.getElementById('feat-emergency').checked = feats.includes('emergency');
+                    document.getElementById('feat-investment').checked = feats.includes('investment');
+                    document.getElementById('feat-budget').checked = feats.includes('budget');
+                    document.getElementById('feat-forecast').checked = feats.includes('forecast');
+                    document.getElementById('feat-group').checked = feats.includes('group');
+                } else {
+                    // Default for old users OR new users (Enable All by default so they can uncheck)
+                    ['emergency','investment','budget','forecast','group'].forEach(id => {
+                        document.getElementById('feat-'+id).checked = true;
+                    });
+                }
+            }
+        };
+
+        window.saveFeatures = async () => {
+            const features = [];
+            if(document.getElementById('feat-emergency').checked) features.push('emergency');
+            if(document.getElementById('feat-investment').checked) features.push('investment');
+            if(document.getElementById('feat-budget').checked) features.push('budget');
+            if(document.getElementById('feat-forecast').checked) features.push('forecast');
+            if(document.getElementById('feat-group').checked) features.push('group');
+
+            await updateDoc(doc(db, "users", currentUser.uid), { features: features });
+            
+            document.getElementById('feature-modal').style.display = 'none';
+            if(document.getElementById('dashboard').style.display !== 'grid') {
+                showDashboard();
+            }
+        };
+
+        // --------------------------------------------------------
+        // 3. DASHBOARD & LISTENERS
+        // --------------------------------------------------------
+        function showDashboard() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-header').style.display = 'flex';
+            document.getElementById('dashboard').style.display = 'grid';
+            document.getElementById('user-name').innerText = "Hello, " + currentUser.email.split('@')[0];
+            
+            // Start The Real-time Listener (Handles Everything)
+            listenToUserProfile();
+            
+            listenToExpenses(); 
+            listenToInvites(); 
+            listenToConnections(); 
+            listenToSplits(); 
+        }
+
+        function listenToUserProfile() {
+            onSnapshot(doc(db, "users", currentUser.uid), (doc) => {
+                if (doc.exists()) {
+                    const d = doc.data();
+                    monthlyIncome = d.income;
+                    emergencyGoal = d.emergencyGoal || 0;
+                    investmentGoal = d.investmentGoal || 0;
+                    investmentDetails = d.investmentDetails || "None";
+                    currentSavings = d.savings || 0;
+
+                    // Update UI Numbers
+                    document.getElementById('income-display').innerText = `+ ₹${monthlyIncome.toLocaleString()}`;
+                    document.getElementById('emergency-goal-display').innerText = `₹${emergencyGoal.toLocaleString()} / month`;
+                    document.getElementById('emergency-display').innerText = `₹ ${emergencyGoal.toLocaleString()}`;
+                    document.getElementById('investment-display').innerText = `₹ ${investmentGoal.toLocaleString()}`;
+                    document.getElementById('investment-detail-display').innerText = investmentDetails;
+                    document.getElementById('savings-display').innerText = `₹ ${currentSavings.toLocaleString()}`;
+
+                    // Update Gamification
+                    let points = d.points || 0;
+                    let currentLevel = Math.floor(points / 100);
+                    let color = currentLevel >= 3 ? '#eab308' : (currentLevel >= 1 ? '#3b82f6' : '#64748b');
+                    document.querySelector('.points-badge').innerHTML = 
+                        `<span class="material-icons" style="color:${color}">military_tech</span><span>Lvl ${currentLevel} (${points} pts)</span>`;
+
+                    // --- INSTANT FEATURE TOGGLING ---
+                    // Default to ALL enabled if user has no features array (Legacy User Support)
+                    const feats = d.features && d.features.length > 0 ? d.features : ['emergency','investment','budget','forecast','group']; 
+                    
+                    toggleCard('card-emergency', feats.includes('emergency'));
+                    toggleCard('card-investment', feats.includes('investment'));
+                    toggleCard('card-budget', feats.includes('budget'));
+                    toggleCard('card-forecast', feats.includes('forecast'));
+                    toggleCard('card-group', feats.includes('group'));
+                }
+            });
+        }
+
+        function toggleCard(id, shouldShow) {
+            const el = document.getElementById(id);
+            if(el) el.style.display = shouldShow ? 'block' : 'none';
+        }
+
+        // --------------------------------------------------------
+        // 4. ACTION FUNCTIONS (Withdraw, Deposit, AI, etc.)
+        // --------------------------------------------------------
+        window.depositSavings = async () => {
+            const availableFunds = monthlyIncome - emergencyGoal - investmentGoal;
+            const bal = availableFunds - globalTotalSpent;
+            if (bal <= 0) return alert("No funds to save!");
+            if (!confirm(`Deposit ₹${bal}?`)) return;
+            await updateDoc(doc(db, "users", currentUser.uid), { savings: currentSavings + bal });
+            await addDoc(collection(db, "expenses"), { uid: currentUser.uid, item: "Transfer to Savings", amount: bal, category: "Savings", createdAt: serverTimestamp() });
+        };
+
+        window.withdrawEmergency = async () => {
+            if (emergencyGoal <= 0) return alert("Emergency Fund is empty!");
+            if (!confirm("🚨 Do you want to withdraw from your Emergency Fund?")) return;
+            const amountStr = prompt(`Available: ₹${emergencyGoal}\nHow much to withdraw?`);
+            const amount = Number(amountStr);
+            if (!amount || amount <= 0 || amount > emergencyGoal) return alert("Invalid amount.");
+            const reason = prompt("What is this emergency for?") || "Unspecified";
+            await updateDoc(doc(db, "users", currentUser.uid), { emergencyGoal: emergencyGoal - amount });
+            await addDoc(collection(db, "expenses"), { uid: currentUser.uid, item: `🚨 Emergency: ${reason}`, amount: amount, category: "Emergency", createdAt: serverTimestamp() });
+        };
+
+        window.updateInvestments = async () => {
+            const currentGoal = investmentGoal || 0;
+            if(currentGoal > 0 && !confirm(`Current: ₹${currentGoal}\nUpdate Plan?`)) return;
+            const amountStr = prompt("New monthly investment amount:", currentGoal);
+            if (amountStr === null) return; 
+            const newAmount = Number(amountStr);
+            if (isNaN(newAmount) || newAmount < 0) return alert("Invalid amount.");
+            const newDesc = prompt("Breakdown?", investmentDetails);
+            await updateDoc(doc(db, "users", currentUser.uid), { investmentGoal: newAmount, investmentDetails: newDesc || "None" });
+        };
+
+        window.simulateWeekEnd = async () => {
+            if(!confirm("Start Demo: Simulate successful week completion?")) return;
+            const snap = await getDoc(doc(db, "users", currentUser.uid));
+            const newPoints = (snap.data().points || 0) + 100;
+            await updateDoc(doc(db, "users", currentUser.uid), { points: newPoints });
+            alert(`🎉 Success! +100 Points!`);
+        };
+
+        // --------------------------------------------------------
+        // 5. EXPENSES & AI LOGIC
+        // --------------------------------------------------------
+        function listenToExpenses() {
+            const q = query(collection(db, "expenses"), where("uid", "==", currentUser.uid));
+            onSnapshot(q, (snap) => {
+                const list = document.getElementById('expense-list'); 
+                list.innerHTML = ""; 
+                let total = 0;
+                let expenses = [];
+                snap.forEach(d => expenses.push(d.data()));
+                expenses.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+
+                let dataPoints = [];
+                expenses.forEach(da => {
+                    const isEmergency = da.category === "Emergency";
+                    const cssClass = isEmergency ? "transaction-item emergency-expense" : "transaction-item";
+                    // Prepend to show Newest First
+                    list.insertAdjacentHTML('afterbegin', `<div class="${cssClass}"><span>${da.item} <small>(${da.category})</small></span><b>₹${da.amount}</b></div>`);
+                    total += Number(da.amount);
+                    dataPoints.push(Number(da.amount));
+                });
+
+                globalTotalSpent = total;
+                const availableFunds = monthlyIncome - emergencyGoal - investmentGoal;
+                const bal = availableFunds - total;
+
+                document.getElementById('total-spent').innerText = `- ₹${total.toLocaleString()}`;
+                document.getElementById('total-balance').innerText = `₹${bal.toLocaleString()}`;
+                document.getElementById('total-balance').style.color = bal <= 0 ? "var(--danger)" : "white";
+
+                if (dataPoints.length > 2) runTensorFlowPrediction(dataPoints);
+            });
+        }
+
+        window.addExpense = async () => {
+            const txt=document.getElementById('smart-input').value; if(!txt)return;
+            let amt = Number(txt.match(/(\d+)/)?.[0] || 0); let cat=document.getElementById('manual-category').value; let item=txt;
+            
+            const availableFunds = monthlyIncome - emergencyGoal - investmentGoal;
+            if ((availableFunds - globalTotalSpent - amt) < 0) return alert("❌ Insufficient Balance!");
+            
+            // Using Gemma to extract details. Prompt adjusted for small model.
+            if(txt.includes(" ") && model) { 
+                try { 
+                    const prompt = `You are a financial parser. Extract "item", "amount" (number), and "category" from: "${txt}". 
+                    Default category: "${cat}". 
+                    Return ONLY valid JSON. No markdown. No notes.
+                    Example: {"item": "Lunch", "amount": 250, "category": "Food"}`;
+                    
+                    const r = await model.generateContent(prompt); 
+                    const responseText = r.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+                    const d = JSON.parse(responseText); 
+                    
+                    if(d.amount) amt = d.amount; 
+                    if(d.category) cat = d.category; 
+                    if(d.item) item = d.item; 
+                } catch(e) { console.log("Gemma Parse Error (Using manual inputs):", e); } 
+            }
+            await addDoc(collection(db, "expenses"), {uid:currentUser.uid, item, amount:amt, category:cat, createdAt:serverTimestamp()});
+            document.getElementById('smart-input').value="";
+        };
+
+        window.generateAIBudget = async () => {
+            const suggestionBox = document.getElementById('ai-suggestion');
+            const timeDisplay = document.getElementById('time-left-display');
+            const inputs = { food: document.getElementById('budget-food'), bills: document.getElementById('budget-bills'), trans: document.getElementById('budget-transport'), shop: document.getElementById('budget-shopping') };
+            
+            const today = new Date();
+            const daysLeft = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
+            const weeksLeft = (daysLeft / 7).toFixed(1);
+
+            timeDisplay.innerText = `${daysLeft} days / ${weeksLeft} wks left`;
+            const availableFunds = monthlyIncome - emergencyGoal - investmentGoal;
+            const remainingBalance = availableFunds - globalTotalSpent;
+            suggestionBox.innerText = `Analyzing ₹${remainingBalance} for ${daysLeft} days...`;
+            
+            const btn = document.querySelector("button[onclick='generateAIBudget()']");
+            btn.disabled = true;
+
+            try {
+                const prompt = `I have ₹${remainingBalance} for ${daysLeft} days. Suggest a budget breakdown for: food, bills, transport, shopping. 
+                Return ONLY valid JSON like: {"food": 1000, "bills": 2000, "transport": 500, "shopping": 500}. No markdown.`;
+                
+                const res = await model.generateContent(prompt);
+                const responseText = res.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+                const d = JSON.parse(responseText);
+                
+                inputs.food.value = d.food; inputs.bills.value = d.bills; inputs.trans.value = d.transport; inputs.shop.value = d.shopping;
+                await updateDoc(doc(db, "users", currentUser.uid), { weeklyBudget: (d.food+d.bills+d.transport+d.shopping), budgetStartDate: serverTimestamp() });
+                suggestionBox.innerText = "✅ AI Plan Generated & Saved!";
+            } catch(e) {
+                console.log("Gemma Budget Error:", e);
+                const safeFactor = Math.max(1, daysLeft / 7);
+                const safeSpend = Math.max(0, Math.floor(remainingBalance / safeFactor)); 
+                inputs.food.value = Math.floor(safeSpend * 0.4); inputs.bills.value = Math.floor(safeSpend * 0.3);
+                inputs.trans.value = Math.floor(safeSpend * 0.2); inputs.shop.value = Math.floor(safeSpend * 0.1);
+                suggestionBox.innerText = "✅ AI Plan Generated & Saved!";
+            } finally { btn.disabled = false; }
+        };
+
+        // --- TENSORFLOW ---
+        async function runTensorFlowPrediction(data) {
+            const xValues = data.map((_, i) => i); const yValues = data;
+            const tfModel = tf.sequential(); tfModel.add(tf.layers.dense({units: 1, inputShape: [1]}));
+            tfModel.compile({loss: 'meanSquaredError', optimizer: 'sgd'});
+            const xs = tf.tensor2d(xValues, [xValues.length, 1]); const ys = tf.tensor2d(yValues, [yValues.length, 1]);
+            await tfModel.fit(xs, ys, {epochs: 100});
+            const nextIndex = xValues.length;
+            const prediction = tfModel.predict(tf.tensor2d([nextIndex, nextIndex+1, nextIndex+2], [3, 1]));
+            const predictedValues = Array.from(prediction.dataSync());
+            
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            
+            const labels = [...xValues.map(x => `Tx ${x+1}`), 'Next 1', 'Next 2', 'Next 3'];
+            const actualData = [...yValues, null, null, null];
+            const predictedData = Array(yValues.length - 1).fill(null); 
+            predictedData.push(yValues[yValues.length - 1]); predictedData.push(...predictedValues);
+            
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: [{ label: 'Actual', data: actualData, borderColor: '#2563eb', fill: false }, { label: 'Forecast', data: predictedData, borderColor: '#f59e0b', borderDash: [5, 5], fill: false }] },
+                options: { responsive: true }
+            });
+            xs.dispose(); ys.dispose();
+        }
+
+        // --- SOCIAL ---
+        window.sendInvite = async () => { const email = prompt("Friend's Email:"); if(!email)return; await addDoc(collection(db, "connections"), { from:currentUser.email, to:email, users:[currentUser.email, email], status:"pending", createdAt:serverTimestamp() }); alert("Invite Sent!"); };
+        function listenToInvites() { const q = query(collection(db, "connections"), where("to", "==", currentUser.email), where("status", "==", "pending")); onSnapshot(q, (s) => { const area=document.getElementById('notification-area'); document.querySelectorAll('.invite-req').forEach(e=>e.remove()); s.forEach(d => { const div=document.createElement('div'); div.className='notification-item invite-req'; div.innerHTML=`<span>${d.data().from.split('@')[0]} wants to connect</span><button class="accept-btn" onclick="acceptInvite('${d.id}')">Accept</button>`; area.prepend(div); }); }); }
+        window.acceptInvite = async (id) => await updateDoc(doc(db, "connections", id), { status:"accepted" });
+        function listenToConnections() { const q = query(collection(db, "connections"), where("users", "array-contains", currentUser.email), where("status", "==", "accepted")); onSnapshot(q, (s) => { if(!s.empty) { activeFriendEmail = s.docs[0].data().users.find(u=>u!==currentUser.email); document.getElementById('active-friend-display').style.display='block'; document.getElementById('friend-name-text').innerText=activeFriendEmail; document.getElementById('split-btn').disabled=false; document.getElementById('split-btn').style.opacity=1; document.getElementById('empty-group-msg').style.display='none'; } else { activeFriendEmail = null; document.getElementById('active-friend-display').style.display='none'; document.getElementById('split-btn').disabled=true; document.getElementById('split-btn').style.opacity=0.5; document.getElementById('empty-group-msg').style.display='block'; } }); }
+        window.addSplitExpense = async () => { const item=prompt("Item?"); const amt=Number(prompt("Amount?")); if(item && amt) await addDoc(collection(db, "splits"), { payer:currentUser.email, participants:[currentUser.email, activeFriendEmail], item, amount:amt, status:"pending", createdAt:serverTimestamp() }); };
+        function listenToSplits() { const q = query(collection(db, "splits"), where("participants", "array-contains", currentUser.email)); onSnapshot(q, (s) => { const list=document.getElementById('group-list'); document.querySelectorAll('.split-req').forEach(e=>e.remove()); list.innerHTML=""; const notify=document.getElementById('notification-area'); s.forEach(d => { const da=d.data(); if(da.status==="pending" && da.payer!==currentUser.email) { const div=document.createElement('div'); div.className='notification-item split-req'; div.innerHTML=`<span>${da.payer.split('@')[0]}: ₹${da.amount/2} for ${da.item}</span><div><button class="accept-btn" onclick="respond('${d.id}','ok')">✔</button><button class="reject-btn" onclick="respond('${d.id}','no')">✖</button></div>`; notify.appendChild(div); } else if(da.status==="confirmed") { const div=document.createElement('div'); div.className='transaction-item'; if(da.payer===currentUser.email) { div.innerHTML=`<span>You paid ${da.item}</span><span style="color:var(--success)">They owe ₹${da.amount/2}</span>`; } else { const owed = da.amount / 2; div.innerHTML=`<span>${da.payer.split('@')[0]} paid ${da.item}</span><div style="display:flex;align-items:center;"><span style="color:var(--danger)">You owe ₹${owed}</span><button class="pay-btn" onclick="payDebt('${d.id}', ${owed}, '${da.payer.split('@')[0]}', '${da.item}')">Pay</button></div>`; } list.appendChild(div); } }); }); }
+        window.respond = async (id, type) => { if(type==='no') await deleteDoc(doc(db,"splits",id)); else await updateDoc(doc(db,"splits",id), {status:"confirmed"}); };
+        window.payDebt = async (docId, amount, friendName, item) => { const availableFunds = monthlyIncome - emergencyGoal - investmentGoal; if ((availableFunds - globalTotalSpent - amount) < 0) return alert("❌ Insufficient Balance to pay debt!"); if(!confirm(`Pay ₹${amount} to ${friendName} and disconnect?`)) return; await addDoc(collection(db, "expenses"), { uid: currentUser.uid, item: `Paid ${friendName} for ${item}`, amount: amount, category: "Debt Payment", createdAt: serverTimestamp() }); await deleteDoc(doc(db, "splits", docId)); try { const q = query(collection(db, "connections"), where("users", "array-contains", currentUser.email), where("status", "==", "accepted")); const snapshot = await getDocs(q); snapshot.forEach(async (d) => { if (d.data().users.includes(activeFriendEmail)) await deleteDoc(doc(db, "connections", d.id)); }); } catch(e) { console.log("Disconnect error", e); } alert("Payment successful! Debt cleared and group disconnected."); };
+    </script>
 </body>
 </html>

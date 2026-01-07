@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gemini Connection Tester</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .log { background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 5px; font-family: monospace; }
+        .success { background: #d1fae5; color: #065f46; border: 1px solid #34d399; }
+        .error { background: #fee2e2; color: #991b1b; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🛠️ Gemini Universal Tester</h1>
+    <p>This script will try every model name until one works.</p>
+    <button onclick="startTest()">Start Diagnostic</button>
+    <div id="results" style="margin-top: 20px;"></div>
+
+    <script>
+        // ---------------------------------------------------------
+        // PASTE YOUR KEY HERE
+        const API_KEY = "AIzaSyDbPqhaW2QWjkxBrPri2fcioJ6dM6jV4i4"; 
+        // ---------------------------------------------------------
+
+        const modelsToTry = [
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-001",
+            "gemini-1.5-flash-latest",
+            "gemini-pro",
+            "gemini-1.0-pro",
+            "gemini-1.5-pro"
+        ];
+
+        async function startTest() {
+            const results = document.getElementById('results');
+            results.innerHTML = "<h3>Testing...</h3>";
+
+            for (const modelName of modelsToTry) {
+                log(`Trying model: <b>${modelName}</b>...`, "");
+                
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`;
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: "Hello, reply with the word Success." }] }]
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        log(`✅ SUCCESS! The working name is: <b>${modelName}</b>`, "success");
+                        log(`👉 Go back to your main code and replace the model name with: "${modelName}"`, "success");
+                        return; // Stop after finding a working one
+                    } else {
+                        log(`❌ Failed (${response.status}). Name "${modelName}" is wrong.`, "error");
+                    }
+                } catch (e) {
+                    log(`❌ Network Error on "${modelName}".`, "error");
+                }
+            }
+            log("⚠️ All tests failed. Check your API Key.", "error");
+        }
+
+        function log(msg, type) {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.innerHTML = msg;
+            document.getElementById('results').appendChild(div);
+        }
+    </script>
+</body>
+</html>
